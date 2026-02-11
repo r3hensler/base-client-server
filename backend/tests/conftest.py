@@ -1,23 +1,23 @@
-import asyncio
-import uuid
 from collections.abc import AsyncGenerator
 import os
 
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.config import settings
+from app.config import get_settings, settings
 from app.database import Base, get_db
 from app.main import app
+
+# Clear the lru_cache so settings are rebuilt from the test environment.
+# This ensures env vars set by test-backend.sh (or CI) are picked up even
+# if another import already triggered settings construction.
+get_settings.cache_clear()
 
 # Use a separate test database
 # Prefer TEST_DATABASE_URL env var, otherwise derive from main database URL
 TEST_DB_URL = os.getenv(
-    "TEST_DATABASE_URL",
-    settings.database_url.rsplit("/", 1)[0] + "/app_test"
+    "TEST_DATABASE_URL", settings.database_url.rsplit("/", 1)[0] + "/app_test"
 )
 
 
@@ -51,7 +51,9 @@ async def setup_db(engine):
 
 @pytest_asyncio.fixture
 async def db_session(engine) -> AsyncGenerator[AsyncSession, None]:
-    TestSession = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    TestSession = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
     async with TestSession() as session:
         yield session
 
@@ -86,7 +88,9 @@ async def registered_user(client: AsyncClient) -> dict:
 
 
 @pytest_asyncio.fixture
-async def authenticated_client(client: AsyncClient, registered_user: dict) -> AsyncClient:
+async def authenticated_client(
+    client: AsyncClient, registered_user: dict
+) -> AsyncClient:
     """Login and return a client with auth cookies set."""
     resp = await client.post(
         "/api/v1/auth/login",

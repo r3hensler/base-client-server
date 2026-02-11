@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.config import settings
 from app.database import Base
-from app.models import User, RefreshToken  # noqa: F401 — ensure models are registered
+import app.models  # noqa: F401 — ensure models are registered with Base.metadata
 
 config = context.config
 if config.config_file_name is not None:

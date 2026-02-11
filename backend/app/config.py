@@ -1,3 +1,4 @@
+from functools import lru_cache
 from pathlib import Path
 
 from pydantic import field_validator
@@ -30,22 +31,22 @@ class Settings(BaseSettings):
     cookie_samesite: str = "lax"
     cookie_domain: str | None = None  # None = current domain only
 
-    @field_validator('jwt_secret_key')
+    @field_validator("jwt_secret_key")
     @classmethod
     def validate_jwt_secret(cls, v: str) -> str:
         """Ensure JWT secret is cryptographically strong."""
         if not v:
             raise ValueError(
                 "JWT_SECRET_KEY is required. "
-                "Generate with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+                'Generate with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
             )
         if len(v) < 32:
             raise ValueError(
                 "JWT_SECRET_KEY must be at least 32 characters. "
-                "Generate with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+                'Generate with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
             )
         # Warn if looks like a weak secret
-        weak_patterns = ['secret', 'password', 'test', '123', 'admin', 'key']
+        weak_patterns = ["secret", "password", "test", "123", "admin", "key"]
         if any(pattern in v.lower() for pattern in weak_patterns):
             raise ValueError(
                 "JWT_SECRET_KEY appears to contain common weak patterns. "
@@ -53,27 +54,25 @@ class Settings(BaseSettings):
             )
         return v
 
-    @field_validator('cookie_secure')
+    @field_validator("cookie_secure")
     @classmethod
     def validate_cookie_secure(cls, v: bool, info) -> bool:
         """Warn about insecure cookie settings in production."""
         import sys
-        # Get env from validated data (not available yet during validation)
-        # So we check the environment variable directly
-        import os
-        env = os.getenv('ENV', 'development')
 
-        if not v and env in ['production', 'staging']:
+        env = info.data.get("env", "development")
+
+        if not v and env in ["production", "staging"]:
             raise ValueError(
                 "COOKIE_SECURE=false is not allowed in production/staging. "
                 "Cookies without Secure flag can be intercepted over HTTP."
             )
 
-        if not v and env == 'development':
+        if not v and env == "development":
             print(
                 "⚠️  WARNING: COOKIE_SECURE=false - Cookies can be intercepted! "
                 "Only use for local development without HTTPS.",
-                file=sys.stderr
+                file=sys.stderr,
             )
 
         return v
@@ -84,4 +83,16 @@ class Settings(BaseSettings):
     }
 
 
-settings = Settings()
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+
+
+# Lazy proxy so that `from app.config import settings` still works,
+# but construction is deferred until first attribute access.
+class _SettingsProxy:
+    def __getattr__(self, name: str):
+        return getattr(get_settings(), name)
+
+
+settings = _SettingsProxy()

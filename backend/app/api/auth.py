@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, Cookie, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -24,7 +25,9 @@ from app.services.auth import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+def _set_auth_cookies(
+    response: Response, access_token: str, refresh_token: str
+) -> None:
     """Set HttpOnly cookies for both tokens."""
     common = {
         "httponly": True,
@@ -49,11 +52,15 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
 
 
 def _clear_auth_cookies(response: Response) -> None:
-    response.delete_cookie("access_token", path="/")
-    response.delete_cookie("refresh_token", path="/api/v1/auth")
+    response.delete_cookie("access_token", path="/", domain=settings.cookie_domain)
+    response.delete_cookie(
+        "refresh_token", path="/api/v1/auth", domain=settings.cookie_domain
+    )
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+)
 async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     existing = await get_user_by_email(db, body.email)
     if existing:
@@ -63,7 +70,14 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     try:
         user = await create_user(db, body.email, body.password)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)
+        )
+    except IntegrityError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
+        )
+    await db.commit()
     return user
 
 
@@ -78,8 +92,7 @@ async def login(
     # Use a dummy hash if user doesn't exist to maintain constant time
     dummy_hash = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYAhFfC3qMy"
     password_valid = verify_password(
-        body.password,
-        user.hashed_password if user else dummy_hash
+        body.password, user.hashed_password if user else dummy_hash
     )
 
     if not user or not password_valid:
@@ -93,6 +106,7 @@ async def login(
 
     access_token = create_access_token(user.id)
     refresh_token = await create_refresh_token_record(db, user.id)
+    await db.commit()
     _set_auth_cookies(response, access_token, refresh_token)
     return user
 

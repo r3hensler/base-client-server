@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# Environment variables for the test Postgres instance
+export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5433/app
+export TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5433/app_test
+export JWT_SECRET_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(64))")
+
 echo "🐘 Starting PostgreSQL..."
 docker compose -f docker-compose.test.yml up -d
 echo "Waiting for database to be ready..."
@@ -19,12 +24,10 @@ echo "🗄️  Creating test database..."
 docker compose -f docker-compose.test.yml exec -T db psql -U postgres -c "CREATE DATABASE app_test;" 2>/dev/null || echo "Test database already exists"
 
 echo ""
-# Only generate migration if none exist
+# Fail fast if committed migration is missing
 if [ ! -f "alembic/versions/6260199ba8ed_create_users_and_refresh_tokens.py" ]; then
-    echo "🔄 Generating initial migration..."
-    alembic revision --autogenerate -m "create users and refresh_tokens"
-else
-    echo "ℹ️  Migration already exists, skipping generation"
+    echo "❌ Expected migration file not found. Ensure migrations are committed."
+    exit 1
 fi
 
 echo ""
@@ -33,7 +36,7 @@ alembic upgrade head
 
 echo ""
 echo "✅ Running tests..."
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5433/app_test pytest tests/ -v --tb=short
+pytest tests/ -v --tb=short
 
 echo ""
 echo "🚀 Starting development server..."

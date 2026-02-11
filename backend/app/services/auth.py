@@ -15,15 +15,15 @@ from app.models.user import RefreshToken, User
 
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt."""
-    password_bytes = password.encode('utf-8')
+    password_bytes = password.encode("utf-8")
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password_bytes, salt)
-    return hashed.decode('utf-8')
+    return hashed.decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     """Verify a password against a bcrypt hash."""
-    return bcrypt.checkpw(plain.encode('utf-8'), hashed.encode('utf-8'))
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
 
 def validate_password_strength(password: str) -> None:
@@ -35,11 +35,11 @@ def validate_password_strength(password: str) -> None:
         raise ValueError("Password must be at least 8 characters")
     if len(password) > 128:
         raise ValueError("Password must not exceed 128 characters")
-    if not re.search(r'[A-Z]', password):
+    if not re.search(r"[A-Z]", password):
         raise ValueError("Password must contain at least one uppercase letter")
-    if not re.search(r'[a-z]', password):
+    if not re.search(r"[a-z]", password):
         raise ValueError("Password must contain at least one lowercase letter")
-    if not re.search(r'\d', password):
+    if not re.search(r"\d", password):
         raise ValueError("Password must contain at least one digit")
     if not re.search(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/~`]', password):
         raise ValueError("Password must contain at least one special character")
@@ -55,7 +55,9 @@ def create_access_token(user_id: uuid.UUID) -> str:
         "aud": "base-client-server-api",  # Audience
         "type": "access",
     }
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return jwt.encode(
+        payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+    )
 
 
 def decode_access_token(token: str) -> dict:
@@ -85,24 +87,29 @@ async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
 
 
 async def create_user(db: AsyncSession, email: str, password: str) -> User:
+    """Create a new user. Flushes only — caller is responsible for committing."""
     validate_password_strength(password)
     user = User(email=email, hashed_password=hash_password(password))
     db.add(user)
-    await db.commit()
+    await db.flush()
     await db.refresh(user)
     return user
 
 
 async def create_refresh_token_record(db: AsyncSession, user_id: uuid.UUID) -> str:
-    """Create a refresh token in the DB. Returns the raw token (for the cookie)."""
+    """Create a refresh token in the DB. Returns the raw token (for the cookie).
+
+    Only flushes (does not commit) — caller is responsible for committing the transaction.
+    """
     raw_token, token_hash = generate_refresh_token()
     record = RefreshToken(
         user_id=user_id,
         token_hash=token_hash,
-        expires_at=datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days),
+        expires_at=datetime.now(UTC)
+        + timedelta(days=settings.refresh_token_expire_days),
     )
     db.add(record)
-    await db.commit()
+    await db.flush()
     return raw_token
 
 
@@ -110,13 +117,16 @@ async def rotate_refresh_token(db: AsyncSession, raw_token: str) -> tuple[User, 
     """Validate, revoke, and reissue a refresh token. Returns (user, new_raw_token).
 
     Raises ValueError if the token is invalid, expired, or already revoked.
+    Uses SELECT FOR UPDATE to prevent concurrent rotation of the same token.
     """
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
     result = await db.execute(
-        select(RefreshToken).where(
+        select(RefreshToken)
+        .where(
             RefreshToken.token_hash == token_hash,
             RefreshToken.revoked_at.is_(None),
         )
+        .with_for_update()
     )
     record = result.scalar_one_or_none()
 
@@ -132,7 +142,7 @@ async def rotate_refresh_token(db: AsyncSession, raw_token: str) -> tuple[User, 
     user_result = await db.execute(select(User).where(User.id == record.user_id))
     user = user_result.scalar_one()
 
-    # Issue new token
+    # Issue new token (flush only, we commit the whole transaction here)
     new_raw_token = await create_refresh_token_record(db, user.id)
     await db.commit()
     return user, new_raw_token

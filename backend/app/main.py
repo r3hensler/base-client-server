@@ -19,11 +19,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=()"
+        )
 
-        # Only add HSTS in production with HTTPS
-        if request.url.scheme == "https" and settings.env in ["production", "staging"]:
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        # Add HSTS in production/staging (Caddy terminates TLS, so scheme may be http)
+        if settings.env in ["production", "staging"]:
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains"
+            )
 
         return response
 

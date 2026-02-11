@@ -73,6 +73,7 @@ class TestAccessToken:
         user_id = uuid.uuid4()
         from datetime import UTC, datetime, timedelta
         from app.config import settings
+
         payload = {
             "sub": str(user_id),
             "exp": datetime.now(UTC) + timedelta(minutes=15),
@@ -94,6 +95,7 @@ class TestRefreshToken:
 
     def test_hash_is_deterministic(self):
         import hashlib
+
         raw, expected_hash = generate_refresh_token()
         actual_hash = hashlib.sha256(raw.encode()).hexdigest()
         assert actual_hash == expected_hash
