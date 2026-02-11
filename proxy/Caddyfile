@@ -1,0 +1,37 @@
+{$SITE_ADDRESS:localhost} {
+    log {
+        output stdout
+        format json
+    }
+
+    # Security headers applied to all responses
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        X-XSS-Protection "0"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
+    }
+
+    # Limit request body size (1MB for JSON API; increase if file uploads needed)
+    request_body {
+        max_size 1MB
+    }
+
+    # API routes -> FastAPI backend
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    # Health check passthrough
+    handle /health {
+        reverse_proxy backend:8000
+    }
+
+    # Everything else -> React frontend
+    handle {
+        reverse_proxy frontend:5173
+    }
+}

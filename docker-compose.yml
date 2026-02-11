@@ -1,0 +1,59 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-app}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5173"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  proxy:
+    build:
+      context: ./proxy
+    ports:
+      - "${PROXY_HTTP_PORT:-80}:80"
+      - "${PROXY_HTTPS_PORT:-443}:443"
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+
+volumes:
+  pgdata:
