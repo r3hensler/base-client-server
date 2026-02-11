@@ -54,7 +54,7 @@ cd backend && alembic revision --autogenerate -m "description"
 
 ### Frontend
 ```bash
-cd frontend && npm ci
+cd frontend && npm ci --legacy-peer-deps
 
 # Dev server
 cd frontend && npm run dev
@@ -63,10 +63,10 @@ cd frontend && npm run dev
 cd frontend && npm run build
 
 # Lint (ESLint 10, flat config)
-cd frontend && npx eslint .
+cd frontend && npm run lint
 
 # Typecheck only
-cd frontend && npx tsc --noEmit
+cd frontend && npm run typecheck
 
 # Run all tests
 cd frontend && npm test
@@ -109,7 +109,7 @@ All under `/api/v1/auth`: `POST /register`, `POST /login`, `POST /refresh`, `POS
 
 **Backend:** pytest + pytest-asyncio. Tests use a separate `app_test` database with tables created/dropped per test via the `setup_db` autouse fixture. The `client` fixture overrides `get_db` to use the test session. `registered_user` and `authenticated_client` fixtures handle common setup.
 
-**Frontend:** Vitest with jsdom environment. Tests mock `../src/api/client` to avoid network calls. Components are wrapped with `BrowserRouter` + `AuthProvider` via a `renderWithProviders` helper.
+**Frontend:** Vitest with jsdom environment. Tests mock `../src/api/client` to avoid network calls. Components are wrapped with `BrowserRouter` + `AuthProvider` via a `renderWithProviders` helper. Use `vi.hoisted()` when declaring mock variables referenced inside `vi.mock()` factory functions (see `AuthContext.test.tsx` for the pattern).
 
 ## CI Workflows (GitHub Actions)
 
