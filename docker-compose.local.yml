@@ -1,0 +1,22 @@
+services:
+  db:
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: ./backend
+    volumes:
+      - ./backend:/app
+    command: ["--reload"]  # Appended to entrypoint uvicorn args
+    environment:
+      ENV: development
+      COOKIE_SECURE: "false"  # Allows HTTP in local dev if needed
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules  # Preserve container's node_modules

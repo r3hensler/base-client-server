@@ -20,11 +20,19 @@ FastAPI + React + PostgreSQL full-stack template with JWT-based authentication u
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
 ```
+Access at https://localhost (accept the self-signed certificate). The local override exposes the database on port 5432, enables backend hot reload via volume mount, and uses the frontend dev stage with Vite HMR.
+
+### Staging
+```bash
+docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --build
+```
+Set `STAGING_DOMAIN` in `.env`. Uses prod frontend build. Caddy auto-provisions TLS via Let's Encrypt.
 
 ### Production
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
+Set `PRODUCTION_DOMAIN` in `.env`. All services restart on failure. Caddy data/config volumes persist TLS certificates.
 
 ### Backend
 ```bash
@@ -84,6 +92,20 @@ python -c "import secrets; print(secrets.token_urlsafe(64))"
 
 Backend tests need `DATABASE_URL` pointing to a test database and `JWT_SECRET_KEY` set. The test conftest derives the test DB URL by replacing `/app` with `/app_test` in `DATABASE_URL`.
 
+### Proxy
+```bash
+# Validate Caddyfile locally (requires Docker)
+docker run --rm -v $(pwd)/proxy/Caddyfile:/etc/caddy/Caddyfile caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+```
+
+## Docker Compose Architecture
+
+- `docker-compose.yml` — Base service definitions (db, backend, frontend, proxy)
+- `docker-compose.local.yml` — Local dev: hot reload, exposed DB port, COOKIE_SECURE=false
+- `docker-compose.staging.yml` — Staging: prod frontend build, restart=unless-stopped, STAGING_DOMAIN
+- `docker-compose.prod.yml` — Production: restart=always, Caddy cert persistence, PRODUCTION_DOMAIN
+- `docker-compose.test.yml` — Standalone test database on port 5433
+
 ## Code Layout Conventions
 
 ### Backend (`backend/app/`)
@@ -101,6 +123,11 @@ Backend tests need `DATABASE_URL` pointing to a test database and `JWT_SECRET_KE
 - `components/` — `LoginForm`, `RegisterForm`, `ProtectedRoute`
 - `pages/` — Route-level page components
 - Tests in `frontend/tests/`, use Vitest + React Testing Library, mock `api/client.ts`
+
+### Proxy (`proxy/`)
+- `Caddyfile` — Reverse proxy config: `/api/*` and `/health` to backend, everything else to frontend
+- `Dockerfile` — Alpine-based Caddy image with Caddyfile copied in
+- `SITE_ADDRESS` env var controls the domain (defaults to `localhost` for local dev)
 
 ### Auth Endpoints
 All under `/api/v1/auth`: `POST /register`, `POST /login`, `POST /refresh`, `POST /logout`, `GET /me`

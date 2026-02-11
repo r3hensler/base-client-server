@@ -1,0 +1,28 @@
+services:
+  db:
+    restart: unless-stopped
+
+  backend:
+    restart: unless-stopped
+    environment:
+      ENV: staging
+      COOKIE_SECURE: "true"
+      COOKIE_SAMESITE: "lax"
+
+  frontend:
+    build:
+      context: ./frontend
+      target: prod
+    restart: unless-stopped
+
+  proxy:
+    restart: unless-stopped
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      SITE_ADDRESS: ${STAGING_DOMAIN:?STAGING_DOMAIN must be set}
+
+volumes:
+  caddy_data:
+  caddy_config:
