@@ -11,8 +11,19 @@
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
         X-XSS-Protection "0"
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
         -Server
+    }
+
+    # HSTS only for non-local hosts to avoid caching HSTS for localhost
+    @secure_hosts {
+        not {
+            host localhost
+            host 127.0.0.1
+            host ::1
+        }
+    }
+    header @secure_hosts {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
     }
 
     # Limit request body size (1MB for JSON API; increase if file uploads needed)

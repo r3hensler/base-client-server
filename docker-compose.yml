@@ -35,7 +35,7 @@ services:
     build:
       context: ./frontend
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5173"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5173"]
       interval: 10s
       timeout: 3s
       retries: 3

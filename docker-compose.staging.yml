@@ -21,7 +21,7 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     environment:
-      SITE_ADDRESS: ${STAGING_DOMAIN}
+      SITE_ADDRESS: ${STAGING_DOMAIN:?STAGING_DOMAIN must be set}
 
 volumes:
   caddy_data:
