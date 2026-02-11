@@ -1,4 +1,4 @@
-{$SITE_ADDRESS:localhost} {
+:{$PORT:80} {
     log {
         output stdout
         format json
@@ -12,19 +12,8 @@
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
         X-XSS-Protection "0"
-        -Server
-    }
-
-    # HSTS only for non-local hosts to avoid caching HSTS for localhost
-    @secure_hosts {
-        not {
-            host localhost
-            host 127.0.0.1
-            host ::1
-        }
-    }
-    header @secure_hosts {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
     }
 
     # Limit request body size (1MB for JSON API; increase if file uploads needed)
@@ -32,18 +21,23 @@
         max_size 1MB
     }
 
-    # API routes -> FastAPI backend
+    # API routes -> FastAPI backend (via Railway private networking)
     handle /api/* {
-        reverse_proxy backend:8000
+        reverse_proxy {$BACKEND_URL}
     }
 
     # Health check passthrough
     handle /health {
-        reverse_proxy backend:8000
+        reverse_proxy {$BACKEND_URL}
     }
 
-    # Everything else -> React frontend
+    # Proxy health check (for Railway deployment validation)
+    handle /proxy/health {
+        respond "OK" 200
+    }
+
+    # Everything else -> React frontend (via Railway private networking)
     handle {
-        reverse_proxy frontend:5173
+        reverse_proxy {$FRONTEND_URL}
     }
 }

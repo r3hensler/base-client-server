@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, Cookie, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
 
 from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
+from app.rate_limit import limiter
 from app.schemas.auth import (
     LoginRequest,
     MessageResponse,
@@ -61,7 +63,10 @@ def _clear_auth_cookies(response: Response) -> None:
 @router.post(
     "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
 )
-async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("3/hour")
+async def register(
+    request: Request, body: RegisterRequest, db: AsyncSession = Depends(get_db)
+):
     existing = await get_user_by_email(db, body.email)
     if existing:
         raise HTTPException(
@@ -82,7 +87,9 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=UserResponse)
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     body: LoginRequest,
     response: Response,
     db: AsyncSession = Depends(get_db),
