@@ -546,7 +546,7 @@ Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 (Backend complete)
 - [x] `cd frontend && npm test` passes all tests (14 tests, 4 suites)
 - [x] `cd frontend && npx eslint .` passes
 - [x] `cd frontend && npx tsc --noEmit` passes
-- [ ] `docker build --target prod -t app-frontend ./frontend` succeeds
+- [x] `docker build --target prod -t app-frontend ./frontend` succeeds
 
 ### After Phase 8 (Full Stack)
 - [ ] `docker compose -f docker-compose.yml -f docker-compose.local.yml up --build` starts all services

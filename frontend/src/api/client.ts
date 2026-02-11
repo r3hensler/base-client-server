@@ -20,6 +20,8 @@ class ApiClient {
           credentials: "same-origin",
         });
         return resp.ok;
+      } catch {
+        return false;
       } finally {
         this.refreshPromise = null;
       }
@@ -40,13 +42,24 @@ class ApiClient {
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const mergedHeaders: HeadersInit =
+      options.headers instanceof Headers
+        ? (() => {
+            const headers = new Headers(options.headers);
+            if (!headers.has("Content-Type")) {
+              headers.set("Content-Type", "application/json");
+            }
+            return headers;
+          })()
+        : {
+            "Content-Type": "application/json",
+            ...(options.headers || {}),
+          };
+
     const init: RequestInit = {
       credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
       ...options,
+      headers: mergedHeaders,
     };
 
     const response = await fetch(`${this.baseUrl}${path}`, init);

@@ -50,12 +50,13 @@ Authentication uses HttpOnly cookies set by the backend. The Caddy proxy ensures
    ```
    Paste the output as the `JWT_SECRET_KEY` value in `.env`.
 
-3. Start all services:
-   ```bash
-   docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
-   ```
+3. (Planned) Docker Compose quick start:
+   > The Docker Compose setup for running all services with a single command will be available in Phase 8.
+   > Until then, follow the instructions in the **Development** section below to run the backend, frontend, and database.
 
-4. Open https://localhost (accept the self-signed certificate).
+4. Open the app:
+   - **With Docker Compose (Phase 8+):** https://localhost (accept the self-signed certificate)
+   - **Local development:** http://localhost:5173 (frontend dev server)
 
 ## Development
 
