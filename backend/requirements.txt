@@ -13,6 +13,7 @@ bcrypt>=5.0.0
 
 # Config
 pydantic-settings>=2.7.0
+email-validator>=2.1.0
 
 # Testing
 pytest>=8.3.0
