@@ -20,3 +20,7 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules  # Preserve container's node_modules
+
+  proxy:
+    volumes:
+      - ./proxy/Caddyfile.local:/etc/caddy/Caddyfile  # Relaxed CSP for Vite HMR

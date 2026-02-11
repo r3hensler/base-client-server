@@ -8,11 +8,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.config import get_settings, settings
 from app.database import Base, get_db
 from app.main import app
+from app.rate_limit import limiter
 
 # Clear the lru_cache so settings are rebuilt from the test environment.
 # This ensures env vars set by test-backend.sh (or CI) are picked up even
 # if another import already triggered settings construction.
 get_settings.cache_clear()
+
+# Disable rate limiting during tests
+limiter.enabled = False
 
 # Use a separate test database
 # Prefer TEST_DATABASE_URL env var, otherwise derive from main database URL

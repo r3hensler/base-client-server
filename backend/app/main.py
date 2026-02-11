@@ -2,12 +2,15 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
 from app.api.router import api_router
 from app.config import settings
 from app.database import engine
+from app.rate_limit import limiter
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -39,6 +42,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="App", lifespan=lifespan)
+
+# Rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Add security headers middleware
 app.add_middleware(SecurityHeadersMiddleware)

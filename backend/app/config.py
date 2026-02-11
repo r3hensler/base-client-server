@@ -20,6 +20,21 @@ class Settings(BaseSettings):
     db_pool_recycle: int = 3600
     db_echo: bool = False
 
+    @field_validator("database_url")
+    @classmethod
+    def ensure_asyncpg_url(cls, v: str) -> str:
+        """Auto-convert postgresql:// to postgresql+asyncpg:// (Railway compatibility)."""
+        if v.startswith("postgresql://"):
+            import sys
+
+            print(
+                "INFO: Auto-converted DATABASE_URL scheme: "
+                "postgresql:// -> postgresql+asyncpg://",
+                file=sys.stderr,
+            )
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
+
     # JWT
     jwt_secret_key: str  # No default — must be set
     jwt_algorithm: str = "HS256"
