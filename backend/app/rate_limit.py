@@ -4,10 +4,7 @@ from slowapi import Limiter
 
 
 def _get_client_ip(request: Request) -> str:
-    """Extract real client IP from X-Forwarded-For (set by Caddy reverse proxy)."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """Derive client IP from the connection information for rate limiting."""
     return request.client.host if request.client else "unknown"
 
 

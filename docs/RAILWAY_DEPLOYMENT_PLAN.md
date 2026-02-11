@@ -80,6 +80,7 @@ Added `ensure_asyncpg_url` validator that auto-converts `postgresql://` to `post
 | `ENV` | `production` |
 | `COOKIE_SECURE` | `true` |
 | `COOKIE_SAMESITE` | `lax` |
+| `FORWARDED_ALLOW_IPS` | `*` (backend is private — only proxy can reach it) |
 
 **Settings:**
 - Health check path: `/health`
