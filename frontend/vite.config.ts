@@ -9,7 +9,7 @@ export default defineConfig({
     // In local dev (without Caddy), proxy API calls to backend
     proxy: {
       "/api": {
-        target: "http://backend:8000",
+        target: "http://localhost:8000",
         changeOrigin: true,
       },
     },
