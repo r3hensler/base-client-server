@@ -1,7 +1,7 @@
 # Railway Deployment - Lessons Learned
 
 **Platform:** Railway
-**Last Updated:** February 11, 2026
+**Last Updated:** February 12, 2026
 
 ---
 
@@ -15,6 +15,9 @@ This document captures lessons learned from deploying FastAPI + React + Caddy ap
 3. Database migrations (Alembic) should auto-run on startup for simple deployments
 4. Railway private networking uses specific patterns with reference variables
 5. Structured logging to stdout is essential for Railway observability
+6. Railway public domains require the port to be explicitly set in networking settings
+7. Dockerfile heredocs can silently corrupt Caddyfiles — use quoted heredocs (`<<'EOF'`)
+8. Keep Caddyfile addresses simple: `:{$PORT:80}` without `http://` prefix
 
 ---
 
@@ -28,8 +31,10 @@ This document captures lessons learned from deploying FastAPI + React + Caddy ap
 6. [Logging and Observability](#6-logging-and-observability)
 7. [Health Checks and Restart Policies](#7-health-checks-and-restart-policies)
 8. [Port Configuration](#8-port-configuration)
-9. [Cost and Resource Optimization](#9-cost-and-resource-optimization)
-10. [CI/CD Integration](#10-cicd-integration)
+9. [Debugging 502 Errors](#9-debugging-502-errors)
+10. [Dockerfile Heredoc Pitfalls](#10-dockerfile-heredoc-pitfalls)
+11. [Cost and Resource Optimization](#11-cost-and-resource-optimization)
+12. [CI/CD Integration](#12-cicd-integration)
 
 ---
 
@@ -367,9 +372,112 @@ exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
    - Private domain: Uses the PORT env var Railway sets
    - Public domain: Always 443 (HTTPS) externally, routed to your PORT internally
 
+6. **Public domain requires explicit port configuration:**
+   In Railway's service Settings → Networking, the public domain must have its port explicitly set to match the service's PORT. Without this, Railway's edge returns 502 even though the container is running and healthy.
+
+7. **Caddyfile address format — no `http://` prefix:**
+   Use `:{$PORT:80}` not `http://:{$PORT:80}`. The `http://` scheme prefix can cause Caddy to handle the address differently and has been observed to cause routing failures on Railway. The bare port format matches Railway's working Caddy patterns.
+
 ---
 
-## 9. Cost and Resource Optimization
+## 9. Debugging 502 Errors
+
+### Common 502 Causes on Railway
+
+502 errors on Railway can come from two different sources, and the debugging approach differs for each:
+
+**Railway Edge 502** — Railway's edge proxy returns 502 before the request reaches your container:
+- Public domain port not configured in service networking settings
+- Service not listening on the PORT Railway assigned
+- Container crashed or is restarting
+
+**Caddy Reverse Proxy 502** — Your Caddy container returns 502 because it can't reach an upstream:
+- Private networking DNS resolution failure
+- Upstream service port mismatch (FRONTEND_URL/BACKEND_URL doesn't match the actual listening port)
+- Upstream service not running
+
+### How to Tell the Difference
+
+Add a `log` block to the Caddyfile and check Deploy Logs:
+
+```caddyfile
+:{$PORT:80} {
+    log {
+        output stdout
+    }
+    ...
+}
+```
+
+- If 502 requests **appear** in Caddy's access logs → Caddy received the request but upstream failed
+- If 502 requests **don't appear** in Caddy's logs → Railway's edge is returning 502, the request never reaches Caddy
+
+### Isolation Test
+
+Replace a `reverse_proxy` handler with a static response to confirm public traffic reaches Caddy:
+
+```caddyfile
+handle {
+    respond "Hello from Caddy" 200
+}
+```
+
+If this still returns 502, the problem is between Railway's edge and your container (check public domain port settings). If it returns 200, the problem is with the upstream connection (check private networking URLs and ports).
+
+### Key Lessons
+
+1. **Always set the port on the public domain** — In service Settings → Networking, the public domain port must match your service's PORT
+2. **Check Deploy Logs, not just HTTP Logs** — Railway's HTTP Logs show status codes but not error details. Caddy's stdout logs (in Deploy Logs) show the actual failure reason
+3. **The proxy health check (`/proxy/health`) passing does NOT mean routing works** — It only confirms the container is running, not that upstream services are reachable
+4. **Start simple, add complexity later** — Begin with a minimal Caddyfile that matches a known-working pattern, then add security headers, logging, etc. incrementally
+
+---
+
+## 10. Dockerfile Heredoc Pitfalls
+
+### The Problem
+
+The frontend Dockerfile used an inline heredoc to create a Caddyfile:
+
+```dockerfile
+COPY <<EOF /etc/caddy/Caddyfile
+http://:{$PORT:5173} {
+    root * /srv
+    file_server
+    try_files {path} /index.html
+}
+EOF
+```
+
+This caused the frontend Caddy to listen on port 80 instead of 5173, and serve empty responses. The `$PORT` variable was being expanded at Docker build time (when PORT is unset), corrupting the Caddy env var placeholder `{$PORT:5173}`.
+
+### The Fix
+
+Use a **quoted heredoc** (`<<'EOF'`) to prevent any variable expansion, and remove the `http://` prefix:
+
+```dockerfile
+COPY <<'EOF' /etc/caddy/Caddyfile
+:{$PORT:5173} {
+    root * /srv
+    file_server
+    try_files {path} /index.html
+}
+EOF
+```
+
+### Key Lessons
+
+1. **Always use quoted heredocs (`<<'EOF'`) in Dockerfiles** when the content contains `$` characters meant for runtime interpretation (Caddy env vars, shell variables, etc.)
+
+2. **Docker COPY heredocs should not expand variables** per the spec, but behavior varies across BuildKit versions. Quoting the delimiter is a defensive best practice.
+
+3. **Symptoms of heredoc expansion:** Service listens on unexpected port (typically 80 for Caddy), Caddyfile formatting warnings, empty responses despite the container being healthy
+
+4. **Alternative: use a separate file** — For more complex Caddyfiles, copy a file instead of using a heredoc (as done for the proxy with `Caddyfile.railway`). This completely avoids expansion issues.
+
+---
+
+## 11. Cost and Resource Optimization
 
 ### Estimated Costs
 
@@ -402,7 +510,7 @@ From [Railway Best Practices](https://docs.railway.com/overview/best-practices):
 
 ---
 
-## 10. CI/CD Integration
+## 12. CI/CD Integration
 
 ### Railway Auto-Deploy Flow
 
@@ -425,18 +533,20 @@ From [Railway Best Practices](https://docs.railway.com/overview/best-practices):
 
 ---
 
-## Summary: Top 10 Lessons
+## Summary: Top 12 Lessons
 
 1. **Use a reverse proxy for Safari/iOS compatibility** — Caddy is simple and effective
 2. **Vite env vars need Docker ARG** — Runtime ENV doesn't work for build-time embedding
 3. **Auto-run Alembic migrations on startup** — Simplifies deployment workflow
 4. **Use `exec` in startup scripts** — Proper signal handling for graceful shutdown
-5. **Use `http://` for private networking** — HTTPS breaks internal communication
+5. **Use `http://` for private networking URLs** — HTTPS breaks internal communication
 6. **Bind to 0.0.0.0** — Required for Railway to reach your container
 7. **Log to stdout as JSON** — Railway parses structured logs automatically
-8. **Use `:{$PORT:default}` in Caddyfiles** — Railway compatibility with local fallback
+8. **Use `:{$PORT:default}` in Caddyfiles** — No `http://` prefix, Railway compatibility with local fallback
 9. **Private networking is free** — Keep related services in same project
 10. **Non-root users for security** — Run as non-root in all containers
+11. **Set the port on public domains** — Railway's edge needs explicit port configuration to route traffic
+12. **Use quoted heredocs (`<<'EOF'`)** — Prevents build-time `$PORT` expansion that corrupts Caddyfiles
 
 ---
 
