@@ -4,6 +4,11 @@
         reverse_proxy {$BACKEND_URL}
     }
 
+    # Backend health check passthrough
+    handle /health {
+        reverse_proxy {$BACKEND_URL}
+    }
+
     # Proxy health check
     handle /proxy/health {
         respond "OK" 200
