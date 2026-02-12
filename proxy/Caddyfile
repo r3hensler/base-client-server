@@ -34,12 +34,16 @@
 
     # API routes -> FastAPI backend
     handle /api/* {
-        reverse_proxy backend:8000
+        reverse_proxy backend:8000 {
+            header_up X-Real-IP {remote_host}
+        }
     }
 
     # Health check passthrough
     handle /health {
-        reverse_proxy backend:8000
+        reverse_proxy backend:8000 {
+            header_up X-Real-IP {remote_host}
+        }
     }
 
     # Everything else -> React frontend

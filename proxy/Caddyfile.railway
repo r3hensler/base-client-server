@@ -1,3 +1,9 @@
+{
+    servers {
+        trusted_proxies static private_ranges
+    }
+}
+
 :{$PORT:80} {
     log {
         output stdout
@@ -23,12 +29,16 @@
 
     # Backend API routes — preserve /api prefix
     handle /api/* {
-        reverse_proxy {$BACKEND_URL}
+        reverse_proxy {$BACKEND_URL} {
+            header_up X-Real-IP {client_ip}
+        }
     }
 
     # Backend health check passthrough
     handle /health {
-        reverse_proxy {$BACKEND_URL}
+        reverse_proxy {$BACKEND_URL} {
+            header_up X-Real-IP {client_ip}
+        }
     }
 
     # Proxy health check

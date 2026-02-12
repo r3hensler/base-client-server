@@ -4,11 +4,14 @@ from slowapi import Limiter
 
 
 def _get_client_ip(request: Request) -> str:
-    """Derive client IP from X-Forwarded-For (trusted proxy) or connection info."""
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        # First IP in the chain is the original client
-        return forwarded_for.split(",")[0].strip()
+    """Derive client IP from X-Real-IP (set by Caddy) or connection info.
+
+    Caddy sets X-Real-IP to the resolved client IP before proxying,
+    so this header cannot be spoofed by clients (unlike X-Forwarded-For).
+    """
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip.strip()
     return request.client.host if request.client else "unknown"
 
 
