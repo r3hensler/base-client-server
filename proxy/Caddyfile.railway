@@ -13,8 +13,8 @@
         respond "OK" 200
     }
 
-    # Frontend — all other routes (SPA)
+    # TEMPORARY: test if public requests reach Caddy
     handle {
-        reverse_proxy {$FRONTEND_URL}
+        respond "Hello from Caddy" 200
     }
 }
