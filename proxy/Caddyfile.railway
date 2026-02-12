@@ -1,4 +1,8 @@
 :{$PORT:80} {
+    log {
+        output stdout
+    }
+
     # Backend API routes — preserve /api prefix
     handle /api/* {
         reverse_proxy {$BACKEND_URL}
