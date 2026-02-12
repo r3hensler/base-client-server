@@ -19,8 +19,8 @@ RUN npm run build
 # -- Prod stage — serve static files via Caddy ───────────────
 FROM caddy:2-alpine AS prod
 COPY --from=build /app/dist /srv
-COPY <<EOF /etc/caddy/Caddyfile
-http://:{$PORT:5173} {
+COPY <<'EOF' /etc/caddy/Caddyfile
+:{$PORT:5173} {
     root * /srv
     file_server
     try_files {path} /index.html
