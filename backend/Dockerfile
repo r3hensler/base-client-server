@@ -13,6 +13,6 @@ USER app
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-  CMD python -c "import urllib.request,os; urllib.request.urlopen('http://[::1]:'+os.environ.get('PORT','8000')+'/health')"
+  CMD python -c "import urllib.request,os; urllib.request.urlopen('http://localhost:'+os.environ.get('PORT','8000')+'/health')"
 
 ENTRYPOINT ["./entrypoint.sh"]
