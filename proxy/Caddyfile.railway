@@ -1,4 +1,4 @@
-:{$PORT:80} {
+http://:{$PORT:80} {
     log {
         output stdout
         format json
