@@ -4,7 +4,11 @@ from slowapi import Limiter
 
 
 def _get_client_ip(request: Request) -> str:
-    """Derive client IP from the connection information for rate limiting."""
+    """Derive client IP from X-Forwarded-For (trusted proxy) or connection info."""
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # First IP in the chain is the original client
+        return forwarded_for.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
 
