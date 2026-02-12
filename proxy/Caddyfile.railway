@@ -1,8 +1,4 @@
 :{$PORT:80} {
-    log {
-        output stdout
-    }
-
     # Backend API routes — preserve /api prefix
     handle /api/* {
         reverse_proxy {$BACKEND_URL}
@@ -13,8 +9,8 @@
         respond "OK" 200
     }
 
-    # TEMPORARY: test if public requests reach Caddy
+    # Frontend — all other routes (SPA)
     handle {
-        respond "Hello from Caddy" 200
+        reverse_proxy {$FRONTEND_URL}
     }
 }
