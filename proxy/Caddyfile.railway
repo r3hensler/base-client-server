@@ -1,6 +1,10 @@
 {
     servers {
-        trusted_proxies static private_ranges
+        # Railway's internal proxy uses CGNAT IPs (100.64.0.0/10) which are
+        # not included in private_ranges. Without this, {client_ip} resolves to
+        # the rotating internal proxy IPs instead of the real client IP, breaking
+        # per-client rate limiting in the backend.
+        trusted_proxies static private_ranges 100.64.0.0/10
     }
 }
 
