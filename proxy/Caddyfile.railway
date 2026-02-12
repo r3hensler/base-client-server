@@ -1,12 +1,44 @@
+{
+    servers {
+        trusted_proxies static private_ranges
+    }
+}
+
 :{$PORT:80} {
+    log {
+        output stdout
+        format json
+    }
+
+    # Security headers applied to all responses
+    header {
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        X-XSS-Protection "0"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
+    }
+
+    # Limit request body size (1MB for JSON API; increase if file uploads needed)
+    request_body {
+        max_size 1MB
+    }
+
     # Backend API routes — preserve /api prefix
     handle /api/* {
-        reverse_proxy {$BACKEND_URL}
+        reverse_proxy {$BACKEND_URL} {
+            header_up X-Real-IP {client_ip}
+        }
     }
 
     # Backend health check passthrough
     handle /health {
-        reverse_proxy {$BACKEND_URL}
+        reverse_proxy {$BACKEND_URL} {
+            header_up X-Real-IP {client_ip}
+        }
     }
 
     # Proxy health check

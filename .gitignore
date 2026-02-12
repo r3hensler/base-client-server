@@ -75,6 +75,7 @@ dist-ssr/
 *.njsproj
 *.sln
 *.sw?
+docs/archive/
 
 # ── Docker ───────────────────────────────────────────────────
 *.log

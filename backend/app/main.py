@@ -41,7 +41,13 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
-app = FastAPI(title="App", lifespan=lifespan)
+app = FastAPI(
+    title="App",
+    lifespan=lifespan,
+    docs_url="/docs" if settings.env == "development" else None,
+    redoc_url="/redoc" if settings.env == "development" else None,
+    openapi_url="/openapi.json" if settings.env == "development" else None,
+)
 
 # Rate limiting
 app.state.limiter = limiter
