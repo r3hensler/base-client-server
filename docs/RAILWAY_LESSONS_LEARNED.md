@@ -18,6 +18,7 @@ This document captures lessons learned from deploying FastAPI + React + Caddy ap
 6. Railway public domains require the port to be explicitly set in networking settings
 7. Dockerfile heredocs can silently corrupt Caddyfiles — use quoted heredocs (`<<'EOF'`)
 8. Keep Caddyfile addresses simple: `:{$PORT:80}` without `http://` prefix
+9. Railway's internal proxy uses CGNAT IPs — add `100.64.0.0/10` to Caddy's `trusted_proxies`
 
 ---
 
@@ -33,8 +34,9 @@ This document captures lessons learned from deploying FastAPI + React + Caddy ap
 8. [Port Configuration](#8-port-configuration)
 9. [Debugging 502 Errors](#9-debugging-502-errors)
 10. [Dockerfile Heredoc Pitfalls](#10-dockerfile-heredoc-pitfalls)
-11. [Cost and Resource Optimization](#11-cost-and-resource-optimization)
-12. [CI/CD Integration](#12-cicd-integration)
+11. [CGNAT IPs and Caddy Trusted Proxies](#11-cgnat-ips-and-caddy-trusted-proxies)
+12. [Cost and Resource Optimization](#12-cost-and-resource-optimization)
+13. [CI/CD Integration](#13-cicd-integration)
 
 ---
 
@@ -477,7 +479,72 @@ EOF
 
 ---
 
-## 11. Cost and Resource Optimization
+## 11. CGNAT IPs and Caddy Trusted Proxies
+
+### The Problem
+
+After deploying security hardening (security headers, rate limiting, disabled OpenAPI docs), rate limiting appeared to work in local testing and directly against the backend, but **failed completely when requests went through the Caddy reverse proxy** on Railway.
+
+Sending 15+ requests to the login endpoint (5/minute limit) through the proxy all returned 401 — none returned 429.
+
+### Root Cause
+
+Railway's internal proxy routes requests through **multiple nodes using CGNAT IPs** (Carrier-Grade NAT, RFC 6598) in the `100.64.0.0/10` range. Observed IPs included `100.64.0.2` through `100.64.0.10`, rotating across requests.
+
+Caddy's `trusted_proxies static private_ranges` includes standard RFC 1918 private ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) but **does not include the CGNAT range**. This meant:
+
+1. Caddy did not trust Railway's internal proxy nodes
+2. `{client_ip}` resolved to the varying CGNAT IPs (e.g., `100.64.0.8`) instead of the real client IP from `X-Forwarded-For`
+3. Caddy set `X-Real-IP` to these rotating internal IPs
+4. The backend's rate limiter saw ~10 different IPs for the same client, scattering requests across separate rate limit buckets
+5. No single bucket ever reached the 5/minute threshold
+
+### How We Diagnosed It
+
+1. **Tested rate limiting directly against the backend** (bypassing proxy) — 429 returned correctly on request 6
+2. **Tested through the proxy** — all requests returned 401, no 429
+3. **Examined Caddy access logs** — `client_ip` field showed rotating CGNAT IPs (`100.64.0.3`, `100.64.0.7`, etc.) while `X-Forwarded-For` and `X-Real-Ip` headers from Railway's edge consistently contained the real client IP
+
+Key log evidence:
+```json
+{"client_ip":"100.64.0.8", "remote_ip":"100.64.0.8", "headers":{"X-Forwarded-For":["82.19.36.231"],"X-Real-Ip":["82.19.36.231"]}}
+{"client_ip":"100.64.0.7", "remote_ip":"100.64.0.7", "headers":{"X-Forwarded-For":["82.19.36.231"],"X-Real-Ip":["82.19.36.231"]}}
+{"client_ip":"100.64.0.4", "remote_ip":"100.64.0.4", "headers":{"X-Forwarded-For":["82.19.36.231"],"X-Real-Ip":["82.19.36.231"]}}
+```
+
+### The Fix
+
+Add `100.64.0.0/10` to Caddy's trusted proxies in `Caddyfile.railway`:
+
+```caddyfile
+{
+    servers {
+        # Railway's internal proxy uses CGNAT IPs (100.64.0.0/10) which are
+        # not included in private_ranges. Without this, {client_ip} resolves to
+        # the rotating internal proxy IPs instead of the real client IP, breaking
+        # per-client rate limiting in the backend.
+        trusted_proxies static private_ranges 100.64.0.0/10
+    }
+}
+```
+
+After this change, `{client_ip}` correctly resolves the real client IP from `X-Forwarded-For`, and rate limiting works as expected through the proxy.
+
+### Key Lessons
+
+1. **Railway uses CGNAT IPs (`100.64.0.0/10`) for internal routing** — These are not in Caddy's `private_ranges` and must be explicitly added to `trusted_proxies`
+
+2. **Caddy's `{client_ip}` depends on trusted proxies** — If the immediate connection IP isn't trusted, Caddy ignores `X-Forwarded-For` and uses the connection IP directly
+
+3. **Test rate limiting through the full request path** — Testing directly against the backend can mask proxy-layer issues. Always verify through the production proxy
+
+4. **Caddy access logs are essential for debugging** — The `client_ip` and `remote_ip` fields in JSON logs immediately revealed the CGNAT IP rotation
+
+5. **Railway's edge already sends the real client IP** — Railway sets `X-Forwarded-For` and `X-Real-Ip` headers with the actual client IP. The fix is simply telling Caddy to trust the source so it reads those headers
+
+---
+
+## 12. Cost and Resource Optimization
 
 ### Estimated Costs
 
@@ -510,7 +577,7 @@ From [Railway Best Practices](https://docs.railway.com/overview/best-practices):
 
 ---
 
-## 12. CI/CD Integration
+## 13. CI/CD Integration
 
 ### Railway Auto-Deploy Flow
 
@@ -533,7 +600,7 @@ From [Railway Best Practices](https://docs.railway.com/overview/best-practices):
 
 ---
 
-## Summary: Top 12 Lessons
+## Summary: Top 13 Lessons
 
 1. **Use a reverse proxy for Safari/iOS compatibility** — Caddy is simple and effective
 2. **Vite env vars need Docker ARG** — Runtime ENV doesn't work for build-time embedding
@@ -547,6 +614,7 @@ From [Railway Best Practices](https://docs.railway.com/overview/best-practices):
 10. **Non-root users for security** — Run as non-root in all containers
 11. **Set the port on public domains** — Railway's edge needs explicit port configuration to route traffic
 12. **Use quoted heredocs (`<<'EOF'`)** — Prevents build-time `$PORT` expansion that corrupts Caddyfiles
+13. **Add CGNAT IPs to Caddy's trusted proxies** — Railway's internal proxy uses `100.64.0.0/10`, which breaks `{client_ip}` resolution
 
 ---
 
