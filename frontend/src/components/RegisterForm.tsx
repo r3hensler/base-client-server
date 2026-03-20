@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { Spinner } from "./Spinner";
 
 export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
   const { register } = useAuth();
@@ -28,39 +29,86 @@ export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <h2>Register</h2>
-      {error && <p role="alert">{error}</p>}
-      <label>
-        Email
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-3xl font-bold text-gray-900">Register</h2>
+        <p className="mt-2 text-sm text-gray-600">Create your account</p>
+      </div>
+
+      {error && (
+        <div
+          className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg"
+          role="alert"
+        >
+          {error}
+        </div>
+      )}
+
+      <div>
+        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+          Email
+        </label>
         <input
+          id="email"
+          name="email"
           type="email"
+          autoComplete="email"
+          required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          required
+          disabled={submitting}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
         />
-      </label>
-      <label>
-        Password
+      </div>
+
+      <div>
+        <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+          Password
+        </label>
         <input
+          id="password"
+          name="password"
           type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
           required
           minLength={8}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={submitting}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
         />
-      </label>
-      <label>
-        Confirm Password
+      </div>
+
+      <div>
+        <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+          Confirm Password
+        </label>
         <input
+          id="confirmPassword"
+          name="confirmPassword"
           type="password"
+          autoComplete="new-password"
+          required
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          required
+          disabled={submitting}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
         />
-      </label>
-      <button type="submit" disabled={submitting}>
-        {submitting ? "Registering\u2026" : "Register"}
+      </div>
+
+      <button
+        type="submit"
+        disabled={submitting}
+        className="w-full bg-gradient-to-r from-purple-600 to-purple-700 text-white font-semibold py-3 px-4 rounded-lg hover:from-purple-700 hover:to-purple-800 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+      >
+        {submitting ? (
+          <span className="flex items-center justify-center">
+            <Spinner className="-ml-1 mr-3 h-5 w-5 text-white" />
+            Registering...
+          </span>
+        ) : (
+          "Register"
+        )}
       </button>
     </form>
   );

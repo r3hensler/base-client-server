@@ -53,7 +53,7 @@ describe("ProtectedRoute", () => {
   it("shows loading state while auth is resolving", () => {
     mockApi.get.mockImplementation(() => new Promise(() => {}));
     renderWithRouter();
-    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
   });
 
   it("redirects to /login when user is not authenticated", async () => {
