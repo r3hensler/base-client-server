@@ -11,7 +11,13 @@
 :{$PORT:80} {
     log {
         output stdout
-        format json
+        format filter {
+            wrap json
+            fields {
+                request>headers delete
+                resp_headers delete
+            }
+        }
     }
 
     # Security headers applied to all responses
