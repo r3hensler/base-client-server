@@ -6,8 +6,14 @@ export function RegisterPage() {
   return (
     <div>
       <RegisterForm onSuccess={() => navigate("/login")} />
-      <p>
-        Already have an account? <Link to="/login">Login</Link>
+      <p className="mt-6 text-center text-sm text-gray-600">
+        Already have an account?{" "}
+        <Link
+          to="/login"
+          className="font-medium text-purple-600 hover:text-purple-700 transition-colors"
+        >
+          Login
+        </Link>
       </p>
     </div>
   );
