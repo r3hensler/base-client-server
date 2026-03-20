@@ -80,7 +80,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
       >
         {submitting ? (
           <span className="flex items-center justify-center">
-            <Spinner className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
+            <Spinner className="-ml-1 mr-3 h-5 w-5 text-white" />
             Logging in...
           </span>
         ) : (

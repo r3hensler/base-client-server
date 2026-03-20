@@ -1,17 +1,13 @@
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { LayoutDashboard, User, LogOut } from "lucide-react";
 
 export function DashboardPage() {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
 
   const handleLogout = () => {
-    void logout()
-      .then(() => navigate("/login"))
-      .catch((error) => {
-        console.error("Logout failed", error);
-      });
+    void logout().catch((error) => {
+      console.error("Logout failed", error);
+    });
   };
 
   return (
