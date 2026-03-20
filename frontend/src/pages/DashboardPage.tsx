@@ -52,6 +52,7 @@ export function DashboardPage() {
           </div>
           <p className="text-gray-600 mb-4">You are currently logged in</p>
           <button
+            type="button"
             onClick={handleLogout}
             className="w-full flex items-center justify-center space-x-2 border-2 border-red-500 text-red-600 font-medium py-2 px-4 rounded-lg hover:bg-red-50 transition-colors"
           >

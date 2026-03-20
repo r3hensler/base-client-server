@@ -9,7 +9,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     <div className="min-h-screen flex flex-col bg-gray-50">
       <header className="bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg">
         <div className="px-4 py-4">
-          <h1 className="text-xl font-semibold">Dashboard</h1>
+          <span className="text-xl font-semibold">Dashboard</span>
         </div>
       </header>
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-8">
